@@ -28,11 +28,13 @@ public class TwitterProducer {
     String consumerSecret = "ydQqtT03BiCCSe5SgeyuL62to82AxfOQBWzQaNYFmpLXuZVz1s";
     String token = "195128492-Hulv5pgcxIhAjrKTUid3W8Vw0ffwWcEyqkwc1Brh";
     String secret = "I6loMSpUzkvjKJX8fFPD0HjVmpiUCgCaqqfPSlfSdXTXK";
+    String topico = "eleicoes_twitter";
 
 
     public TwitterProducer(){};
 
     public static void main(String[] args) {
+
         new TwitterProducer().run();
     }
 
@@ -72,7 +74,7 @@ public class TwitterProducer {
             }
             if(msg!= null) {
                 logger.info("msg: " + msg);
-                kafkaProducer.send(new ProducerRecord<String, String>("eleicoes_twitter", null, msg), new Callback() {
+                kafkaProducer.send(new ProducerRecord<String, String>(topico, null, msg), new Callback() {
                     public void onCompletion(RecordMetadata recordMetadata, Exception e) {
                         if(e!= null) {
                             logger.error("erro: " + e.getMessage());
@@ -92,7 +94,12 @@ public class TwitterProducer {
 //        props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,"172.17.152.79:9092");
         props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer .class.getName());
         props.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,StringSerializer.class.getName());
-        props.setProperty(ProducerConfig.ACKS_CONFIG,Integer.toString(1));
+
+//        criando um "safe producer".
+        props.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG,"true");
+        props.setProperty(ProducerConfig.ACKS_CONFIG,"all");
+        props.setProperty(ProducerConfig.RETRIES_CONFIG, Integer.toString(Integer.MAX_VALUE));
+        props.setProperty(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, Integer.toString(5));
 
         return new KafkaProducer<String, String>(props);
     }
