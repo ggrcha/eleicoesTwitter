@@ -1,6 +1,9 @@
 package com.github.ggrcha.eleicoesTwitter;
 
+import com.github.ggrcha.eleicoesTwitter.metricas.MetricsProducerReporter;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import com.sun.xml.internal.bind.v2.TODO;
 import com.twitter.hbc.ClientBuilder;
 import com.twitter.hbc.core.Client;
 import com.twitter.hbc.core.Constants;
@@ -11,17 +14,20 @@ import com.twitter.hbc.core.processor.StringDelimitedProcessor;
 import com.twitter.hbc.httpclient.auth.Authentication;
 import com.twitter.hbc.httpclient.auth.OAuth1;
 import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.Metric;
+import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class TwitterProducer {
+public class TwitterProducer implements Runnable{
 
     final Logger logger = LoggerFactory.getLogger(TwitterProducer.class.getName());
     String consumerKey = "6kDugPxgxPoWciw1F0M3ws8oi";
@@ -38,6 +44,62 @@ public class TwitterProducer {
         new TwitterProducer().run();
     }
 
+
+    static class MetricPair {
+        private final MetricName metricName;
+        private final Metric metric;
+        MetricPair(MetricName metricName, Metric metric) {
+            this.metricName = metricName;
+            this.metric = metric;
+        }
+        public String toString() {
+            return metricName.group() + "." + metricName.name();
+        }
+    }
+
+    private void displayMetrics(Map<MetricName, ? extends Metric> metrics) {
+
+        final Set<String> metricsNameFilter = Sets.newHashSet(
+                "record-queue-time-avg", "record-send-rate", "records-per-request-avg",
+                "request-size-max", "network-io-rate", "record-queue-time-avg",
+                "incoming-byte-rate", "batch-size-avg", "response-rate", "requests-in-flight"
+        );
+
+        final Map<String, TwitterProducer.MetricPair> metricsDisplayMap = metrics.entrySet().stream()
+                //Filter out metrics not in metricsNameFilter
+                .filter(metricNameEntry ->
+                        metricsNameFilter.contains(metricNameEntry.getKey().name()))
+                //Filter out metrics not in metricsNameFilter
+                .filter(metricNameEntry ->
+                        !Double.isInfinite(metricNameEntry.getValue().value()) &&
+                                !Double.isNaN(metricNameEntry.getValue().value()) &&
+                                metricNameEntry.getValue().value() != 0
+                )
+                //Turn Map<MetricName,Metric> into TreeMap<String, MetricPair>
+                .map(entry -> new TwitterProducer.MetricPair(entry.getKey(), entry.getValue()))
+                .collect(Collectors.toMap(
+                        TwitterProducer.MetricPair::toString, it -> it, (a, b) -> a, TreeMap::new
+                ));
+
+
+        //display das metricas
+        final StringBuilder builder = new StringBuilder(255);
+        builder.append("\n---------------------------------------\n");
+        metricsDisplayMap.entrySet().forEach(entry -> {
+            TwitterProducer.MetricPair metricPair = entry.getValue();
+            String name = entry.getKey();
+            builder.append(String.format(Locale.US, "%50s%25s\t\t%,-10.2f\t\t%s\n",
+                    name,
+                    metricPair.metricName.name(),
+                    metricPair.metric.value(),
+                    metricPair.metricName.description()
+            ));
+        });
+        builder.append("\n---------------------------------------\n");
+        logger.info(builder.toString());
+    }
+
+
     public void run() {
 //criar um cliente twitter
 
@@ -49,6 +111,7 @@ public class TwitterProducer {
 //criar um producer kafka
 
         KafkaProducer<String,String> kafkaProducer = createKafkaProducer();
+        final Map<MetricName, ? extends Metric> metrics = kafkaProducer.metrics();
 
 // Attempts to establish a connection.
         client.connect();
@@ -63,6 +126,8 @@ public class TwitterProducer {
             }
         ));
 
+        int i=0;
+
 //enviar tweets para o kafka
         while (!client.isDone()) {
             String msg = null;
@@ -73,7 +138,7 @@ public class TwitterProducer {
                 client.stop();
             }
             if(msg!= null) {
-                logger.info("msg: " + msg);
+//                logger.info("msg: " + msg);
                 kafkaProducer.send(new ProducerRecord<String, String>(topico, null, msg), new Callback() {
                     public void onCompletion(RecordMetadata recordMetadata, Exception e) {
                         if(e!= null) {
@@ -81,6 +146,12 @@ public class TwitterProducer {
                         }
                     }
                 });
+                i++;
+                if(i==50) {
+                    displayMetrics(metrics);
+                    i=0;
+                }
+
             }
 
         }
@@ -94,6 +165,13 @@ public class TwitterProducer {
 //        props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,"172.17.152.79:9092");
         props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer .class.getName());
         props.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,StringSerializer.class.getName());
+
+//        compressão dos dados
+        props.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG,"snappy");
+
+//        configuração de batchs
+        props.setProperty(ProducerConfig.LINGER_MS_CONFIG,Integer.toString(20));
+        props.setProperty(ProducerConfig.BATCH_SIZE_CONFIG,Integer.toString(32*1024)); //32 kb - testar
 
 //        criando um "safe producer".
         props.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG,"true");
