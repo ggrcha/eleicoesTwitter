@@ -1,9 +1,5 @@
-package com.github.ggrcha.eleicoesTwitter;
-
-import com.github.ggrcha.eleicoesTwitter.metricas.MetricsProducerReporter;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.sun.xml.internal.bind.v2.TODO;
 import com.twitter.hbc.ClientBuilder;
 import com.twitter.hbc.core.Client;
 import com.twitter.hbc.core.Constants;
@@ -25,7 +21,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class TwitterProducer implements Runnable{
 
@@ -65,7 +60,7 @@ public class TwitterProducer implements Runnable{
                 "incoming-byte-rate", "batch-size-avg", "response-rate", "requests-in-flight"
         );
 
-        final Map<String, TwitterProducer.MetricPair> metricsDisplayMap = metrics.entrySet().stream()
+        final Map<String, MetricPair> metricsDisplayMap = metrics.entrySet().stream()
                 //Filter out metrics not in metricsNameFilter
                 .filter(metricNameEntry ->
                         metricsNameFilter.contains(metricNameEntry.getKey().name()))
@@ -104,7 +99,7 @@ public class TwitterProducer implements Runnable{
 //criar um cliente twitter
 
         /** Set up your blocking queues: Be sure to size these properly based on expected TPS of your stream */
-        BlockingQueue<String> msgQueue = new LinkedBlockingQueue<String>(1000);
+        BlockingQueue<String> msgQueue = new LinkedBlockingQueue<String>(100000);
 
         final Client client = criarClienteTwitter(msgQueue);
 
@@ -126,6 +121,7 @@ public class TwitterProducer implements Runnable{
             }
         ));
 
+//        gato para controlar o print das métricas. retirar quando rodar em thread separado
         int i=0;
 
 //enviar tweets para o kafka

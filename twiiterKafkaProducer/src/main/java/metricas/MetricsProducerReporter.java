@@ -1,4 +1,4 @@
-package com.github.ggrcha.eleicoesTwitter.metricas;
+package metricas;
 
 import com.google.common.collect.Sets;
 import org.apache.kafka.clients.producer.Producer;
