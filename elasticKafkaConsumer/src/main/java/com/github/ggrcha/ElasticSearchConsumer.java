@@ -15,7 +15,6 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
@@ -54,14 +53,18 @@ public class ElasticSearchConsumer {
 
             for (ConsumerRecord<String, String> record : records){
 
-                String id = extractValueFromJason("id_str", record.value());
+                try {
+                    String id = extractValueFromJason("id_str", record.value());
 
-                IndexRequest indexRequest = new IndexRequest(
-                        "twitter",
-                        "tweets",
-                        id).source(record.value(), XContentType.JSON); // idempotent
+                    IndexRequest indexRequest = new IndexRequest(
+                            "twitter",
+                            "tweets",
+                            id).source(record.value(), XContentType.JSON); // idempotent
 
-                bulkRequest.add(indexRequest);
+                    bulkRequest.add(indexRequest);
+                } catch (NullPointerException e) {
+                    logger.warn("tweet inválido: " + record.value());
+                }
 
             }
 
@@ -107,7 +110,6 @@ public class ElasticSearchConsumer {
         String username = "lglobx18ov";
         String password = "j11aodjicy";
 
-        // remove credentialsProvider if you run a local ES
         final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
         credentialsProvider.setCredentials(AuthScope.ANY,
                 new UsernamePasswordCredentials(username, password));
