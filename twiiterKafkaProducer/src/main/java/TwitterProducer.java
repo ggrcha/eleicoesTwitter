@@ -187,7 +187,7 @@ public class TwitterProducer implements Runnable{
         StatusesFilterEndpoint hosebirdEndpoint = new StatusesFilterEndpoint();
 // Optional: set up some followings and track terms
 //        List<Long> followings = Lists.newArrayList(1234L, 566788L);
-        List<String> terms = Lists.newArrayList("bolsonaro", "ciro","haddad","marina","alckmin");
+        List<String> terms = Lists.newArrayList("bolsonaro", "ciro","haddad","marina","alckmin", "lula", "amoedo", "amoêdo");
 //        hosebirdEndpoint.followings(followings);
         hosebirdEndpoint.trackTerms(terms);
 
