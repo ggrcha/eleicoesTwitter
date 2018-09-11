@@ -23,6 +23,7 @@
     <modules>
         <module>twiiterKafkaProducer</module>
         <module>elasticKafkaConsumer</module>
+        <module>kafka-stream-filtro-tweets</module>
     </modules>
 
     <dependencies>
